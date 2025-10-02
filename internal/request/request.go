@@ -56,8 +56,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	readToIndex := 0
 
 	req := Request{
-		RequestLine: RequestLine{},
-		State:       Initialized,
+		State: Initialized,
 	}
 
 	for req.State != Done {
