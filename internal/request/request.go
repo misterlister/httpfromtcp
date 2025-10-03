@@ -27,7 +27,7 @@ type RequestLine struct {
 	Method        string
 }
 
-const crlf = "\r\n"
+const Crlf = "\r\n"
 const BufferSize = 8
 
 func (r *Request) parse(data []byte) (int, error) {
@@ -92,7 +92,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 }
 
 func parseRequestLine(data []byte) (*RequestLine, int, error) {
-	index := bytes.Index(data, []byte(crlf))
+	index := bytes.Index(data, []byte(Crlf))
 	if index == -1 {
 		return nil, 0, nil
 	}
@@ -104,7 +104,7 @@ func parseRequestLine(data []byte) (*RequestLine, int, error) {
 		return nil, 0, err
 	}
 
-	return requestLine, index + len(crlf), nil
+	return requestLine, index + len(Crlf), nil
 }
 
 func requestLineFromString(str string) (*RequestLine, error) {
