@@ -45,7 +45,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 	sep := bytes.Index(data, []byte(":"))
 	if sep == -1 {
-		return 0, false, fmt.Errorf("error: invalid key:value pair. '%s' doesn't contain the ':' separator", string(data))
+		return 0, false, fmt.Errorf("error: invalid 'key: value' pair. '%s' doesn't contain the ':' separator", string(data))
 	}
 
 	keyString := string(data[:sep])
