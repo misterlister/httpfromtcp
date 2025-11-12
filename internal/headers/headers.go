@@ -62,7 +62,13 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 	val := strings.ToLower(strings.TrimSpace(valString))
 
-	h[key] = val
+	_, keyExists := h[key]
+
+	if !keyExists {
+		h[key] = val
+	} else {
+		h[key] = h[key] + ", " + val
+	}
 
 	return endl + len(request.Crlf), false, nil
 }

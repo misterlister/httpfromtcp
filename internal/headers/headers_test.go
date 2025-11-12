@@ -70,4 +70,21 @@ func TestHeaderLineParse(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, len(request.Crlf), n)
 	assert.True(t, done)
+
+	// Test: Valid multi header
+	headers = NewHeaders()
+	data = []byte("Host: localhost:42069\r\nHost: localhost:123456\r\n\r\n")
+	n, done, err = headers.Parse(data)
+	require.NoError(t, err)
+	require.NotNil(t, headers)
+	assert.Equal(t, "localhost:42069", headers["host"])
+	assert.Equal(t, 23, n)
+	assert.False(t, done)
+
+	n, done, err = headers.Parse(data[n:])
+	require.NoError(t, err)
+	require.NotNil(t, headers)
+	assert.Equal(t, "localhost:42069, localhost:123456", headers["host"])
+	assert.Equal(t, 24, n)
+	assert.False(t, done)
 }
