@@ -7,6 +7,9 @@ import (
 	"io"
 	"strings"
 	"unicode"
+
+	"github.com/misterlister/httpfromtcp/internal/consts"
+	"github.com/misterlister/httpfromtcp/internal/headers"
 )
 
 type Status int
@@ -14,10 +17,12 @@ type Status int
 const (
 	Initialized Status = iota
 	Done
+	ParsingHeaders
 )
 
 type Request struct {
 	RequestLine RequestLine
+	Headers     headers.Headers
 	State       Status
 }
 
@@ -27,11 +32,9 @@ type RequestLine struct {
 	Method        string
 }
 
-const Crlf = "\r\n"
-const BufferSize = 8
-
 func (r *Request) parse(data []byte) (int, error) {
-	if r.State == Initialized {
+	switch r.State {
+	case Initialized:
 		reqLine, bytesRead, err := parseRequestLine(data)
 		if err != nil {
 			return 0, err
@@ -41,22 +44,44 @@ func (r *Request) parse(data []byte) (int, error) {
 		}
 
 		r.RequestLine = *reqLine
-		r.State = Done
+		r.State = ParsingHeaders
 		return bytesRead, nil
-	} else if r.State == Done {
+	case ParsingHeaders:
+		totalBytesParsed := 0
+		for r.State != Done {
+			n, done, err := r.Headers.Parse(data[totalBytesParsed:])
+
+			if err != nil {
+				return totalBytesParsed, err
+			}
+
+			if n == 0 {
+				break
+			}
+
+			totalBytesParsed += n
+
+			if done {
+				r.State = Done
+			}
+		}
+		return totalBytesParsed, nil
+	case Done:
 		return 0, fmt.Errorf("error: trying to read data in a done state")
+	default:
+		return 0, fmt.Errorf("error: unknown state")
 	}
-	return 0, fmt.Errorf("error: unknown state")
 }
 
 func RequestFromReader(reader io.Reader) (*Request, error) {
 
-	buf := make([]byte, BufferSize)
+	buf := make([]byte, consts.BufferSize)
 
 	readToIndex := 0
 
 	req := Request{
-		State: Initialized,
+		State:   Initialized,
+		Headers: headers.NewHeaders(),
 	}
 
 	for req.State != Done {
@@ -70,21 +95,21 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 
 		bytesRead, err := reader.Read(buf[readToIndex:])
 		if err != nil {
-			if !errors.Is(err, io.EOF) {
-				return nil, err
+			if errors.Is(err, io.EOF) {
+				if req.State != Done {
+					return nil, fmt.Errorf("error: Incomplete headers")
+				}
+				break
 			}
-			req.State = Done
-			break
+			return nil, err
 		}
 		readToIndex += bytesRead
-		bytesParsed, err := req.parse(buf)
+		bytesParsed, err := req.parse(buf[:readToIndex])
 		if err != nil {
 			return nil, err
 		}
 
-		unparsedBuf := make([]byte, bufLen-bytesParsed)
-		copy(unparsedBuf, buf[bytesParsed:])
-		buf = unparsedBuf
+		copy(buf, buf[bytesParsed:readToIndex])
 		readToIndex -= bytesParsed
 	}
 
@@ -92,7 +117,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 }
 
 func parseRequestLine(data []byte) (*RequestLine, int, error) {
-	index := bytes.Index(data, []byte(Crlf))
+	index := bytes.Index(data, []byte(consts.Crlf))
 	if index == -1 {
 		return nil, 0, nil
 	}
@@ -104,7 +129,7 @@ func parseRequestLine(data []byte) (*RequestLine, int, error) {
 		return nil, 0, err
 	}
 
-	return requestLine, index + len(Crlf), nil
+	return requestLine, index + len(consts.Crlf), nil
 }
 
 func requestLineFromString(str string) (*RequestLine, error) {
