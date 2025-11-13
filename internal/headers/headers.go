@@ -6,13 +6,23 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/misterlister/httpfromtcp/internal/request"
+	"github.com/misterlister/httpfromtcp/internal/consts"
 )
 
 type Headers map[string]string
 
 func NewHeaders() Headers {
 	return make(Headers)
+}
+
+func AddHeaderValue(h Headers, key, val string) {
+	_, keyExists := h[key]
+
+	if !keyExists {
+		h[key] = val
+	} else {
+		h[key] = h[key] + ", " + val
+	}
 }
 
 var ValidHeaderCharacters = map[rune]bool{
@@ -34,13 +44,13 @@ var ValidHeaderCharacters = map[rune]bool{
 }
 
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
-	endl := bytes.Index(data, []byte(request.Crlf))
+	endl := bytes.Index(data, []byte(consts.Crlf))
 	if endl == -1 {
 		return 0, false, nil
 	}
 
 	if endl == 0 {
-		return len(request.Crlf), true, nil
+		return len(consts.Crlf), true, nil
 	}
 
 	sep := bytes.Index(data, []byte(":"))
@@ -51,7 +61,11 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	keyString := string(data[:sep])
 	valString := string(data[sep+1 : endl])
 
-	if keyString[sep-1] == ' ' {
+	if len(keyString) == 0 {
+		return 0, false, fmt.Errorf("error: invalid key. Key cannot be empty")
+	}
+
+	if keyString[len(keyString)-1] == ' ' {
 		return 0, false, fmt.Errorf("error: invalid key. '%s' ends in whitespace", keyString)
 	}
 
@@ -60,17 +74,11 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 		return 0, false, fmt.Errorf("error: invalid key. '%s' contains invalid characters", key)
 	}
 
-	val := strings.ToLower(strings.TrimSpace(valString))
+	val := strings.TrimSpace(valString)
 
-	_, keyExists := h[key]
+	AddHeaderValue(h, key, val)
 
-	if !keyExists {
-		h[key] = val
-	} else {
-		h[key] = h[key] + ", " + val
-	}
-
-	return endl + len(request.Crlf), false, nil
+	return endl + len(consts.Crlf), false, nil
 }
 
 func isValidHeaderString(s string) bool {
