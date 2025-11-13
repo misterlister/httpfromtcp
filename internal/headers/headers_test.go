@@ -3,7 +3,7 @@ package headers
 import (
 	"testing"
 
-	"github.com/misterlister/httpfromtcp/internal/request"
+	"github.com/misterlister/httpfromtcp/internal/consts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -68,7 +68,7 @@ func TestHeaderLineParse(t *testing.T) {
 	data = []byte("\r\n")
 	n, done, err = headers.Parse(data)
 	require.NoError(t, err)
-	assert.Equal(t, len(request.Crlf), n)
+	assert.Equal(t, len(consts.Crlf), n)
 	assert.True(t, done)
 
 	// Test: Valid multi header
