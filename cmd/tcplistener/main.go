@@ -27,14 +27,23 @@ func main() {
 
 		fmt.Println("A connection has been accepted!")
 
-		requestLine, err := request.RequestFromReader(conn)
+		request, err := request.RequestFromReader(conn)
 		if err != nil {
 			log.Fatalf("error parsing request: %s\n", err.Error())
 		}
 
 		fmt.Println("Request line:")
-		fmt.Printf("- Method: %s\n", requestLine.RequestLine.Method)
-		fmt.Printf("- Target: %s\n", requestLine.RequestLine.RequestTarget)
-		fmt.Printf("- Version: %s\n", requestLine.RequestLine.HttpVersion)
+		fmt.Printf("- Method: %s\n", request.RequestLine.Method)
+		fmt.Printf("- Target: %s\n", request.RequestLine.RequestTarget)
+		fmt.Printf("- Version: %s\n", request.RequestLine.HttpVersion)
+
+		if len(request.Headers) > 0 {
+			fmt.Println("Headers:")
+
+			for key, val := range request.Headers {
+				fmt.Printf("- %s: %s\n", key, val)
+			}
+		}
+
 	}
 }
