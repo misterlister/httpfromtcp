@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -18,11 +19,13 @@ const (
 	Initialized Status = iota
 	Done
 	ParsingHeaders
+	ParsingBody
 )
 
 type Request struct {
 	RequestLine RequestLine
 	Headers     headers.Headers
+	Body        []byte
 	State       Status
 }
 
@@ -48,7 +51,7 @@ func (r *Request) parse(data []byte) (int, error) {
 		return bytesRead, nil
 	case ParsingHeaders:
 		totalBytesParsed := 0
-		for r.State != Done {
+		for r.State != ParsingBody {
 			n, done, err := r.Headers.Parse(data[totalBytesParsed:])
 
 			if err != nil {
@@ -62,10 +65,34 @@ func (r *Request) parse(data []byte) (int, error) {
 			totalBytesParsed += n
 
 			if done {
-				r.State = Done
+				r.State = ParsingBody
 			}
 		}
 		return totalBytesParsed, nil
+	case ParsingBody:
+		contentLenString, valid := r.Headers.Get("Content-Length")
+		if !valid {
+			r.State = Done
+			return 0, nil
+		}
+		contentLen, err := strconv.Atoi(contentLenString)
+
+		if err != nil {
+			return 0, err
+		}
+
+		dataLen := len(data)
+
+		r.Body = append(r.Body, data...)
+		if len(r.Body) > contentLen {
+			return dataLen, errors.New("error: body length exceeds declared content-length")
+		}
+
+		if len(r.Body) == contentLen {
+			r.State = Done
+		}
+
+		return dataLen, nil
 	case Done:
 		return 0, fmt.Errorf("error: trying to read data in a done state")
 	default:
@@ -82,6 +109,7 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 	req := Request{
 		State:   Initialized,
 		Headers: headers.NewHeaders(),
+		Body:    make([]byte, 0),
 	}
 
 	for req.State != Done {
@@ -93,20 +121,19 @@ func RequestFromReader(reader io.Reader) (*Request, error) {
 			buf = newBuf
 		}
 
-		bytesRead, err := reader.Read(buf[readToIndex:])
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				if req.State != Done {
-					return nil, fmt.Errorf("error: Incomplete headers")
-				}
-				break
-			}
-			return nil, err
+		bytesRead, readErr := reader.Read(buf[readToIndex:])
+		if readErr != nil && !errors.Is(readErr, io.EOF) {
+			return nil, readErr
 		}
+
 		readToIndex += bytesRead
 		bytesParsed, err := req.parse(buf[:readToIndex])
 		if err != nil {
 			return nil, err
+		}
+
+		if errors.Is(readErr, io.EOF) && req.State != Done {
+			return nil, fmt.Errorf("error: Incomplete headers")
 		}
 
 		copy(buf, buf[bytesParsed:readToIndex])
