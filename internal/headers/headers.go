@@ -43,6 +43,12 @@ var ValidHeaderCharacters = map[rune]bool{
 	'~':  true,
 }
 
+func (h Headers) Get(key string) (string, bool) {
+	value := h[strings.ToLower(key)]
+	valid := value != ""
+	return value, valid
+}
+
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	endl := bytes.Index(data, []byte(consts.Crlf))
 	if endl == -1 {
